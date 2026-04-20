@@ -1,0 +1,253 @@
+/**
+ * popup-page.css — สไตล์สำหรับหน้า Settings (Popup)
+ *
+ * ไฟล์นี้เก็บ CSS ทั้งหมดสำหรับ popup.html (หน้าตั้งค่า extension)
+ * แยกออกมาจาก inline styles ใน popup.html เพื่อความอ่านง่าย
+ *
+ * โครงสร้าง:
+ *   1. Layout หลัก (body, h2)
+ *   2. Language Switch Toggle (มุมขวาบน)
+ *   3. Settings Row (แต่ละ setting)
+ *   4. Shortcut Input
+ *   5. Tooltip (คำอธิบาย)
+ *   6. Toggle Switch (on/off)
+ *   7. Volume Slider
+ *   8. Buttons (Confirm / Default)
+ */
+
+/* =============================================================================
+   1. Layout หลัก
+   ============================================================================= */
+
+body {
+  width: 320px;
+  padding: 16px;
+  font-family: Arial, sans-serif;
+  position: relative;
+}
+
+h2 {
+  margin-top: 0;
+}
+
+
+/* =============================================================================
+   2. Language Switch (ปุ่มสลับ EN/TH ที่มุมขวาบน)
+   ============================================================================= */
+
+.lang-switch {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+
+/* =============================================================================
+   3. Settings Row (แต่ละแถว setting)
+   ============================================================================= */
+
+.setting {
+  margin: 10px 0;
+  display: flex;
+  align-items: center;
+}
+
+
+/* =============================================================================
+   4. Shortcut Input (ช่องกรอกปุ่มลัด)
+   ============================================================================= */
+
+.shortcut-container {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+}
+
+.shortcut-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 24px;
+}
+
+#shortcutKey {
+  width: 110px;
+  padding: 3px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+
+/* =============================================================================
+   5. Tooltip (เครื่องหมาย ? พร้อมคำอธิบาย)
+   ============================================================================= */
+
+.tooltip {
+  position: relative;
+  display: inline-block;
+  margin-left: 5px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: bold;
+  color: #555;
+  border: 1px solid #aaa;
+  border-radius: 50%;
+  width: 12px;
+  height: 12px;
+  text-align: center;
+  line-height: 12px;
+  background: #f9f9f9;
+}
+
+/* Tooltip popup (ซ่อนไว้ จนกว่าจะ hover) */
+.tooltip .tooltiptext {
+  visibility: hidden;
+  width: 180px;
+  background-color: #333;
+  color: #fff;
+  text-align: left;
+  border-radius: 5px;
+  padding: 5px;
+  position: absolute;
+  z-index: 1;
+  bottom: 125%;
+  left: 50%;
+  margin-left: -90px;
+  opacity: 0;
+  transition: opacity 0.3s;
+  font-size: 11px;
+}
+
+/* แสดง tooltip เมื่อ hover */
+.tooltip:hover .tooltiptext {
+  visibility: visible;
+  opacity: 1;
+}
+
+
+/* =============================================================================
+   6. Toggle Switch (ปุ่ม on/off แบบสไลด์)
+   ============================================================================= */
+
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 24px;
+}
+
+/* ซ่อน checkbox จริง */
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+/* พื้นหลัง slider (สีเทาตอน off) */
+.slider {
+  position: absolute;
+  cursor: pointer;
+  background-color: #ccc;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  transition: 0.4s;
+  border-radius: 24px;
+}
+
+/* ปุ่มกลม (สีทอง) */
+.slider::before {
+  position: absolute;
+  content: "";
+  height: 20px;
+  width: 20px;
+  left: 2px;
+  bottom: 2px;
+  background-color: gold;
+  transition: 0.4s;
+  border-radius: 50%;
+  box-shadow: 0 0 3px rgba(0, 0, 0, 0.3);
+}
+
+/* ตอนเปิด (checked): พื้นหลังเป็นสีฟ้า */
+input:checked+.slider {
+  background-color: #007bff;
+}
+
+/* ตอนเปิด: เลื่อนปุ่มกลมไปขวา */
+input:checked+.slider::before {
+  transform: translateX(26px);
+}
+
+
+/* =============================================================================
+   7. Volume Slider Row
+   ============================================================================= */
+
+.volume-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 24px;
+  margin-top: 6px;
+}
+
+.volume-label {
+  font-size: 12px;
+  width: 30px;
+}
+
+.volume-value {
+  font-size: 12px;
+  width: 30px;
+  text-align: right;
+}
+
+
+/* =============================================================================
+   8. Buttons (Confirm / Default Setting)
+   ============================================================================= */
+
+.button-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+button {
+  padding: 8px;
+  border: none;
+  border-radius: 5px;
+  font-weight: bold;
+  cursor: pointer;
+  flex: 1;
+}
+
+/* ปุ่ม Confirm (สีฟ้า) */
+#savebutton {
+  background-color: #007bff;
+  color: white;
+}
+
+/* ปุ่ม Default (สีขาว + ขอบ) */
+#defaultbutton {
+  background-color: #ffffff;
+  border: 1px solid #ccc;
+}
+
+
+/* =============================================================================
+   9. Result text
+   ============================================================================= */
+
+#result {
+  margin-top: 12px;
+  font-size: 12px;
+}
