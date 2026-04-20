@@ -863,7 +863,9 @@ class DesktopHelperWindow(QMainWindow):
                                  suggestion_data.replace("[Converted] ", ""))
                     self.suggestions_list.addItem(item)
                 elif isinstance(suggestion_data, dict):
-                    item = QListWidgetItem(suggestion_data["suggestion"])
+                    source = suggestion_data["source_word"]
+                    suggestion = suggestion_data["suggestion"]
+                    item = QListWidgetItem(f"{suggestion}  (fix: {source})")
                     item.setData(Qt.UserRole, suggestion_data)
                     self.suggestions_list.addItem(item)
 
