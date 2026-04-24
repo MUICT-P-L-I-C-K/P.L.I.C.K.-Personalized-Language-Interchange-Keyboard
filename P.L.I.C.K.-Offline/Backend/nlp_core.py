@@ -76,7 +76,9 @@ def convert_keyboard(text: str, to_lang: str) -> str:
         if to_lang == "en":
             result.append(THAI_TO_ENG.get(ch, ch))
         else:
-            result.append(ENG_TO_THAI.get(ch, ENG_TO_THAI.get(ch.lower(), ch)) if ch != ch.lower() or not ch.isalpha() else ENG_TO_THAI.get(ch, ch))
+            # Try exact key first (handles symbols and uppercase shifted keys),
+            # then lowercase fallback (handles plain letters).
+            result.append(ENG_TO_THAI.get(ch, ENG_TO_THAI.get(ch.lower(), ch)))
 
     return "".join(result)
 

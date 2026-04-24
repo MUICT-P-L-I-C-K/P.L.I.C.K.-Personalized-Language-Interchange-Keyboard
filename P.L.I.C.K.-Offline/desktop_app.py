@@ -65,17 +65,21 @@ class HotkeyListener(QThread):
             try:
                 if hasattr(key, 'char') and key.char:
                     ch = key.char.lower()
-                    if ch == 'c' and 'ctrl' in pressed and 'shift' in pressed:
-                        self.hotkey_pressed.emit("convert")
-                    elif ch == 'k' and 'ctrl' in pressed and 'shift' in pressed:
-                        self.hotkey_pressed.emit("check")
+                    # Only fire hotkeys when not suppressed — suppress=True means
+                    # the app itself is simulating keypresses (e.g. Ctrl+C to copy
+                    # a word for spell-check) and we must not intercept those.
+                    if not self.suppress:
+                        if ch == 'c' and 'ctrl' in pressed and 'shift' in pressed:
+                            self.hotkey_pressed.emit("convert")
+                        elif ch == 'k' and 'ctrl' in pressed and 'shift' in pressed:
+                            self.hotkey_pressed.emit("check")
 
                 if not self.suppress:
                     if key == keyboard.Key.space or key == keyboard.Key.enter:
                         self.typed_delimiter.emit()
                     elif hasattr(key, 'char') and key.char:
                         try:
-                            if key.char in {',','.', ';',':','!','?','(',')','[',']','{','}','"',"'"}:
+                            if key.char in {',','.', ';',':','!','?','(',')','[',']','{','}','"'}:
                                 self.typed_delimiter.emit()
                         except Exception:
                             pass
@@ -191,6 +195,9 @@ class SpellCheckWorker(QThread):
                     result = nlp_core.thai_suggestions(clean_word)
 
                 for suggestion in result.get("suggestions", []):
+                    # Skip if suggestion is identical to the source word
+                    if suggestion == clean_word:
+                        continue
                     item_data = {
                         "source_word": clean_word,
                         "suggestion":  suggestion,
@@ -791,10 +798,16 @@ class DesktopHelperWindow(QMainWindow):
         def is_latin_char(ch):
             return ch.isascii() and ch.isalpha()
 
-        # Split into segments of (thai | latin+apostrophe | other) characters.
-        # Apostrophe (') is a valid EN->TH keyboard key (maps to ng/ง) so it
-        # must be grouped with Latin chars, not treated as pass-through punctuation.
-        segments = re.findall(r"[\u0e00-\u0e7f]+|[A-Za-z0-9']+|[^\u0e00-\u0e7fA-Za-z0-9']+", original)
+        # Characters that have an EN->TH mapping and must be converted (not passed through).
+        # This covers letters, digits, and every symbol key present in ENG_TO_THAI.
+        EN_CONVERTIBLE = r"A-Za-z0-9`\-=\[\]\\;',./ ~!@#$%^&*()_+{}|:\"<>?"
+
+        # Split into Thai segments (→ EN) and EN-convertible segments (→ TH).
+        # Anything else (spaces, unmapped unicode, etc.) is kept as-is.
+        segments = re.findall(
+            rf"[\u0e00-\u0e7f]+|[{EN_CONVERTIBLE}]+|[^\u0e00-\u0e7f{EN_CONVERTIBLE}]+",
+            original,
+        )
 
         converted_parts = []
         langs_used = set()
@@ -803,12 +816,12 @@ class DesktopHelperWindow(QMainWindow):
                 # Pure Thai segment -> convert to EN
                 converted_parts.append(text_processor.convert_text(seg, "en"))
                 langs_used.add("EN")
-            elif re.fullmatch(r"[A-Za-z0-9']+", seg):
-                # Pure Latin/digit/apostrophe segment -> convert to TH
+            elif re.fullmatch(rf'[{EN_CONVERTIBLE}]+', seg):
+                # EN-keyboard segment -> convert to TH
                 converted_parts.append(text_processor.convert_text(seg, "th"))
                 langs_used.add("TH")
             else:
-                # Punctuation / spaces / symbols — keep as-is
+                # Unmapped characters — keep as-is
                 converted_parts.append(seg)
 
         converted = "".join(converted_parts)
