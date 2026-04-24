@@ -11,32 +11,47 @@ from pythainlp.corpus import get_corpus
 # -----------------------
 # Unshifted keys
 ENG_TO_THAI = {
-    "1": "ๅ", "2": "/", "3": "-", "4": "ภ", "5": "ถ", "6": "ุ", "7": "ึ", "8": "ค", "9": "ต", "0": "จ",
+    # ─── Number row ───
+    "`": "\u0e4f", "1": "ๅ", "2": "/", "3": "-", "4": "ภ", "5": "ถ",
+    "6": "ุ", "7": "ึ", "8": "ค", "9": "ต", "0": "จ",
     "-": "ข", "=": "ช",
-    "q": "ๆ", "w": "ไ", "e": "ำ", "r": "พ", "t": "ะ", "y": "ั", "u": "ี", "i": "ร", "o": "น", "p": "ย",
-    "[": "บ", "]": "ล",
-    "a": "ฟ", "s": "ห", "d": "ก", "f": "ด", "g": "เ", "h": "้", "j": "่", "k": "า", "l": "ส", ";": "ว", "'": "ง",
-    "z": "ผ", "x": "ป", "c": "แ", "v": "อ", "b": "ิ", "n": "ื", "m": "ท", ",": "ม", ".": "ใ", "/": "ฝ",
-    # Shifted letter keys
-    "A": "ฤ", "S": "ฆ", "D": "ฏ", "F": "โ", "G": "ฌ", "H": "็", "I": "ณ", "J": "๋", "K": "ษ", "L": "ศ",
-    "T": "ธ", "U": "๊", "O": "ฯ", "P": "ญ",
-    "Q": "๐", "W": "\"", "E": "ฎ", "R": "ฑ", "Y": "ํ",
-    # Shifted bottom row (corrected: M=?, <=ฒ, >=ฬ, ?=ฦ)
-    "Z": "(", "X": ")", "C": "ฉ", "V": "ฮ", "B": "ฺ", "N": "์",
-    "M": "?", "<": "ฒ", ">": "ฬ",
-    # Shifted symbol keys
-    ":": "ซ",
-    # Shifted number row
-    "!": "+", "@": "๑", "#": "๒", "$": "๓", "%": "๔",
+    # ─── Number row + Shift ───
+    "~": "%", "!": "+", "@": "๑", "#": "๒", "$": "๓", "%": "๔",
     "^": "ู", "&": "฿", "*": "๕", "(": "๖", ")": "๗",
     "_": "๘", "+": "๙",
-    # Shifted bracket keys
-    "{": "ฐ", "}": ",",
-    # Shifted symbol keys missing from duplicates
-    "?": "ฦ", "\"": ".",
+    # ─── Top row (QWERTY) ───
+    "q": "ๆ", "w": "ไ", "e": "ำ", "r": "พ", "t": "ะ",
+    "y": "ั", "u": "ี", "i": "ร", "o": "น", "p": "ย",
+    "[": "บ", "]": "ล", "\\": "ฃ",
+    # ─── Top row + Shift ───
+    "Q": "๐", "W": "\u201c", "E": "ฎ", "R": "ฑ", "T": "ธ",
+    "Y": "ํ", "U": "๊", "I": "ณ", "O": "ฯ", "P": "ญ",
+    "{": "ฐ", "}": ",", "|": "ฅ",
+    # ─── Home row (ASDF) ───
+    "a": "ฟ", "s": "ห", "d": "ก", "f": "ด", "g": "เ",
+    "h": "้", "j": "่", "k": "า", "l": "ส", ";": "ว", "'": "ง",
+    # ─── Home row + Shift ───
+    "A": "ฤ", "S": "ฆ", "D": "ฏ", "F": "โ", "G": "ฌ",
+    "H": "็", "J": "๋", "K": "ษ", "L": "ศ", ":": "ซ", '"': ".",
+    # ─── Bottom row (ZXCV) ───
+    "z": "ผ", "x": "ป", "c": "แ", "v": "อ", "b": "ิ",
+    "n": "ื", "m": "ท", ",": "ม", ".": "ใ", "/": "ฝ",
+    # ─── Bottom row + Shift ───
+    "Z": "(", "X": ")", "C": "ฉ", "V": "ฮ", "B": "ฺ",
+    "N": "์", "M": "?", "<": "ฒ", ">": "ฬ", "?": "ฦ",
 }
 
-THAI_TO_ENG = {tv: ek for ek, tv in ENG_TO_THAI.items()}
+def _build_thai_to_eng():
+    result = {}
+    unshifted   = {k: v for k, v in ENG_TO_THAI.items() if len(k)==1 and k.islower()}
+    shifted_sym = {k: v for k, v in ENG_TO_THAI.items() if len(k)==1 and not k.isalpha()}
+    shifted_let = {k: v for k, v in ENG_TO_THAI.items() if len(k)==1 and k.isupper()}
+    for d in (unshifted, shifted_sym, shifted_let):
+        for eng, thai in d.items():
+            result[thai] = eng
+    return result
+
+THAI_TO_ENG = _build_thai_to_eng()
 
 def _is_thai_char(ch: str) -> bool:
     """Check if a single character is Thai."""
@@ -61,7 +76,7 @@ def convert_keyboard(text: str, to_lang: str) -> str:
         if to_lang == "en":
             result.append(THAI_TO_ENG.get(ch, ch))
         else:
-            result.append(ENG_TO_THAI.get(ch) or ENG_TO_THAI.get(ch.lower(), ch))
+            result.append(ENG_TO_THAI.get(ch, ENG_TO_THAI.get(ch.lower(), ch)) if ch != ch.lower() or not ch.isalpha() else ENG_TO_THAI.get(ch, ch))
 
     return "".join(result)
 
@@ -195,8 +210,7 @@ COMMON_THAI_WORDS = {
     "อยู่", "มี", "เป็น", "ได้", "ต้อง", "จะ", "แล้ว", "อีก", "ก็", "และ",
     "หรือ", "แต่", "ถ้า", "เมื่อ", "ที่", "ซึ่ง", "อัน", "คน", "สิ่ง", "เรื่อง",
     "วัน", "เวลา", "บ้าน", "รถ", "เงิน", "งาน", "ที่นี่", "ตรงนี้", "อะไร", "ใคร",
-    "ทำไม", "อย่างไร", "เท่าไหร่", "ผัดไทย", "ผัดไท", "ต้มยำ", "ส้มตำ","เเล้ว",
-    "สวยงาม","น่ารัก","ดีใจ","เสียใจ","สนุก","เบื่อ","ง่วง","หิว","อร่อย","เหนื่อย",
+    "ทำไม", "อย่างไร", "เท่าไหร่", "ผัดไทย", "ผัดไท", "ต้มยำ", "ส้มตำ",
 }
 
 if thai_words is not None:
