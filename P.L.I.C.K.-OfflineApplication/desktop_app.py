@@ -32,7 +32,7 @@ from PySide6.QtGui import QCursor
 from core import text_processor, language_service, suggestion_engine
 from external.clipboard_strategy import ClipboardStrategy
 from external.uia_strategy import UIAStrategy
-from services import settings_service, sound_service
+from services import settings_service
 
 ICON_PATH = Path(__file__).parent / "PLICK_ICON.png"
 
@@ -46,14 +46,22 @@ class HotkeyListener(QThread):
         super().__init__()
         self.listener = None
         self.suppress = False
+        self._clear_pressed_flag = False
+        self.ctrl_held = False  # True while Ctrl is physically down
     
     def run(self):
         pressed = set()
 
         def on_press(key):
             try:
+                # If the app just lifted suppress, wipe stale modifiers so
+                # real Ctrl+C etc. work cleanly on the next keypress.
+                if self._clear_pressed_flag:
+                    pressed.clear()
+                    self._clear_pressed_flag = False
                 if key in (keyboard.Key.ctrl_l, keyboard.Key.ctrl_r):
                     pressed.add('ctrl')
+                    self.ctrl_held = True
                 elif key in (keyboard.Key.shift, keyboard.Key.shift_l, keyboard.Key.shift_r):
                     pressed.add('shift')
                 elif key in (keyboard.Key.alt_l, keyboard.Key.alt_r):
@@ -86,6 +94,7 @@ class HotkeyListener(QThread):
 
                 if key in (keyboard.Key.ctrl_l, keyboard.Key.ctrl_r):
                     pressed.discard('ctrl')
+                    self.ctrl_held = False
                 elif key in (keyboard.Key.shift, keyboard.Key.shift_l, keyboard.Key.shift_r):
                     pressed.discard('shift')
                 elif key in (keyboard.Key.alt_l, keyboard.Key.alt_r):
@@ -103,6 +112,10 @@ class HotkeyListener(QThread):
                 self.listener.stop()
             except Exception:
                 pass
+
+    def clear_pressed(self):
+        """Signal the listener thread to wipe stale modifier keys on next press."""
+        self._clear_pressed_flag = True
 
 
 class PlainTextEdit(QTextEdit):
@@ -138,7 +151,7 @@ class SpellCheckWorker(QThread):
         all_statuses    = []
         converted       = None
 
-        # ── Keyboard conversion ───────────────────────────────────────────
+        # ── Step 1: Keyboard conversion ───────────────────────────────────
         if self.do_convert:
             target_lang = "en" if self.detected_lang == "th" else "th"
             converted = text_processor.convert_text(self.text, target_lang)
@@ -146,7 +159,32 @@ class SpellCheckWorker(QThread):
                 all_suggestions.append(f"[Converted] {converted}")
                 all_statuses.append(f"Converted to {target_lang.upper()}")
 
-        # ── Spell check word by word ──────────────────────────────────────
+        # ── Step 2: Spell-check the CONVERTED text first ──────────────────
+        # e.g. ็ฟทิำพเำพ → Hamberger → suggest "hamburger (fix: Hamberger)"
+        if self.do_spell and converted and converted != self.text:
+            import re as _re
+            conv_words = [w.strip() for w in _re.split(r'[\s/\\|,;:]+', converted) if w.strip()]
+            for conv_word in conv_words:
+                if not conv_word or len(conv_word) < 2:
+                    continue
+                conv_is_thai = bool(_re.search(r'[\u0E00-\u0E7F]', conv_word))
+                conv_lang = "th" if conv_is_thai else "en"
+                if conv_lang == "en":
+                    result = nlp_core.english_suggestions(conv_word.lower())
+                else:
+                    result = nlp_core.thai_suggestions(conv_word)
+                for suggestion in result.get("suggestions", []):
+                    if suggestion == conv_word:
+                        continue
+                    item_data = {
+                        "source_word": conv_word,
+                        "suggestion":  suggestion,
+                        "lang":        target_lang,
+                    }
+                    if item_data not in all_suggestions:
+                        all_suggestions.append(item_data)
+
+        # ── Step 3: Spell-check the ORIGINAL text ─────────────────────────
         if self.do_spell:
             # Split text into Thai and non-Thai segments first, then
             # tokenize each segment appropriately.
@@ -257,6 +295,10 @@ class DesktopHelperWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
+        # Set always-on-top BEFORE the window is first shown so Windows creates
+        # the native handle with the correct flags — doing it after show() breaks
+        # keyboard focus and prevents Ctrl+C/V from reaching Qt.
+        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
         self.setWindowIcon(QIcon(str(ICON_PATH)))
         self.setWindowTitle("P.L.I.C.K. Personalized Language Interchange Keyboard")
         self.settings = settings_service.load_settings()
@@ -318,15 +360,6 @@ class DesktopHelperWindow(QMainWindow):
         self.shortcut_enabled.hide()
         self.shortcut_key_input = QLineEdit(self)
         self.shortcut_key_input.hide()
-        self.sound_toggle = QCheckBox()
-        self.sound_toggle.setChecked(self.settings.get('sound', True))
-        self.sound_toggle.hide()
-        self.volume_slider = QSlider(Qt.Horizontal)
-        self.volume_slider.setRange(0, 100)
-        self.volume_slider.setValue(self.settings.get('volume', 50))
-        self.volume_slider.hide()
-        self.volume_value_label = QLabel(str(self.volume_slider.value()), self)
-        self.volume_value_label.hide()
 
         self.suggestions_list = QListWidget(self)
         self.suggestions_list.itemClicked.connect(self.apply_suggestion)
@@ -353,11 +386,6 @@ class DesktopHelperWindow(QMainWindow):
         # spell_check_enabled and auto_lang_switch are always-on stubs, not real widgets.
         self.shortcut_enabled.stateChanged.connect(self._on_settings_changed)
         self.shortcut_key_input.textChanged.connect(self._on_settings_changed)
-        self.sound_toggle.stateChanged.connect(self._on_settings_changed)
-        self.volume_slider.valueChanged.connect(lambda v: (
-            self.volume_value_label.setText(str(v)),
-            self._on_settings_changed()
-        ))
 
     def _on_settings_changed(self):
         """Save updated settings."""
@@ -366,8 +394,6 @@ class DesktopHelperWindow(QMainWindow):
             'shortcutKey': self.shortcut_key_input.text() or None,
             'autoLangSwitch': self.auto_lang_switch.isChecked(),
             'spellCheck': self.spell_check_enabled.isChecked(),
-            'sound': self.sound_toggle.isChecked(),
-            'volume': int(self.volume_slider.value()),
         }
         settings_service.save_settings(self.settings)
 
@@ -663,6 +689,11 @@ class DesktopHelperWindow(QMainWindow):
             if not self.auto_lang_switch.isChecked() and not self.spell_check_enabled.isChecked():
                 return
 
+            # If the user is holding Ctrl they're doing a shortcut (Ctrl+C, Ctrl+A, etc.)
+            # — don't intercept their clipboard.
+            if self.hotkey_listener.ctrl_held:
+                return
+
             self.hotkey_listener.suppress = True
             saved = self._safe_pyperclip_paste()
 
@@ -696,8 +727,6 @@ class DesktopHelperWindow(QMainWindow):
                                 item.setData(Qt.UserRole, s)
                                 self.suggestions_list.addItem(item)
 
-                            if self.sound_toggle.isChecked():
-                                sound_service.play_beep(self.volume_slider.value())
                         else:
                             pass
                 finally:
@@ -712,8 +741,7 @@ class DesktopHelperWindow(QMainWindow):
                     except Exception:
                         pass
                     self.hotkey_listener.suppress = False
-
-            # Select previous word (simulate keypresses)
+                    self.hotkey_listener.clear_pressed()
             try:
                 self._kb_controller.press(keyboard.Key.ctrl)
                 self._kb_controller.press(keyboard.Key.shift)
@@ -730,6 +758,7 @@ class DesktopHelperWindow(QMainWindow):
         except Exception:
             try:
                 self.hotkey_listener.suppress = False
+                self.hotkey_listener.clear_pressed()
             except Exception:
                 pass
 

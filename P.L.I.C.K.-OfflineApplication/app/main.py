@@ -45,8 +45,6 @@ def main():
 
     window = DesktopHelperWindow()
 
-    # Keep window always on top of all other applications
-    window.setWindowFlags(window.windowFlags() | Qt.WindowStaysOnTopHint)
     window.show()
     window.raise_()
     window.activateWindow()
