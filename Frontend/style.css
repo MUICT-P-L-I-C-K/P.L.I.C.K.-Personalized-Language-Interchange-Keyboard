@@ -1,0 +1,20 @@
+/**
+ * style.css — สไตล์ที่ inject เข้าทุกหน้าเว็บ (Content Script Styles)
+ *
+ * ไฟล์นี้ถูกโหลดเข้าทุกหน้าเว็บผ่าน manifest.json content_scripts
+ * เก็บเฉพาะ CSS ที่ content script ต้องใช้ (เช่น wavy underline)
+ *
+ * ⚠️ ระวัง: CSS ในไฟล์นี้จะมีผลกับทุกเว็บไซต์
+ *    ดังนั้นใช้ class name ที่ unique (prefix "plick-") ป้องกัน conflict
+ */
+
+/* =============================================================================
+   Wavy Underline (เส้นขีดคำผิด)
+   ใช้ใน contentEditable — เพื่อขีดเส้นใต้คำที่สะกดผิดหรือพิมพ์ผิดภาษา
+   ============================================================================= */
+.plick-underline {
+  text-decoration-line: underline !important;
+  text-decoration-style: wavy !important;
+  text-decoration-thickness: 2px !important;
+  text-underline-offset: 3px !important;
+}
