@@ -1,6 +1,0 @@
-fastapi>=0.104.1
-uvicorn>=0.24.0
-pydantic>=2.6.0
-pythainlp>=4.0
-language-tool-python>=2.7
-python-multipart>=0.0.6
